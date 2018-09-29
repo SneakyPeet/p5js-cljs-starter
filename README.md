@@ -1,4 +1,4 @@
-# p5 cljs Starter Kit
+# P5 CLJS STARTER KIT
 
 A starter project for drawing with P5.js using clojurescript.
 
