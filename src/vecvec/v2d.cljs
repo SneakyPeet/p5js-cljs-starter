@@ -10,6 +10,8 @@
            (* -1 n)))))
 
 
+(defn new [x y] [x y])
+
 
 (defn x
   "Returns the x value of a vector"
