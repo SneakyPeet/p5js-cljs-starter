@@ -48,10 +48,14 @@ Some random dots moving around the screen
   (js/background 240)
   (doseq [dot @*state]
     (draw-dot dot))
+  (frame-rate/show)
   (swap! *state move))
 
 ```
 
+## Components
+
+* Frame Rate: (p5.components.frame-rate/show)
 
 ## Setup
 
