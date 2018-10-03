@@ -10,7 +10,9 @@
            (* -1 n)))))
 
 
-(defn new [x y] [x y])
+(defn new
+  "Creates a new 2d vector"
+  [x y] [x y])
 
 
 (defn x
@@ -24,8 +26,8 @@
 
 
 (defn random
-  "Returns a random 2d floating point number vector with x and y between 0 (inclusive) and
-  n (default 1) (exclusive)"
+  "Returns a random 2d floating point number vector with x and y between -n  and
+  n (exclusive) (n defaults to 1)"
   ([n] [(rand-n n) (rand-n n)])
   ([] (random 1)))
 
@@ -36,5 +38,22 @@
    [(+ v1x v2x) (+ v1y v2y)]))
 
 
-(defn abs [v]
+(defn abs
+  "Returns a vector with x and y absolute"
+  [v]
   (map js/Math.abs v))
+
+
+(defn dist-sq
+  "Calculates the squared euclidean distance between this vector and another"
+  [[v1x v1y] [v2x v2y]]
+  (let [dx (- v1x v2x)
+        dy (- v1y v2y)]
+    (+ (* dx dx) (* dy dy))))
+
+
+(defn dist
+  "Calculates the euclidean distance between this vector and another"
+  [v1 v2]
+  (js/Math.sqrt (dist-sq v1 v2)))
+
