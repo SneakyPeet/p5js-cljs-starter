@@ -1,6 +1,6 @@
 # P5 CLJS STARTER KIT
 
-A starter project for drawing with P5.js using clojurescript.
+A starter project for drawing with P5.js using clojurescript and figwheel.
 
 This project does not try and wrap P5.js. Instead it simply provides the ability to manage drawing state with clojurescript data types while allowing you to directly access the drawing power of p5.js.
 
