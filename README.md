@@ -4,7 +4,6 @@ A starter project for drawing with P5.js using clojurescript.
 
 This project does not try and wrap P5.js. Instead it simply provides the ability to manage drawing state with clojurescript data types while allowing you to directly access the drawing power of p5.js.
 
-see `src/vecvec/v2d.cljs` for some 2d vector helpers
 
 ## Example
 
