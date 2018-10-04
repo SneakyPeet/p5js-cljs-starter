@@ -55,7 +55,22 @@ Some random dots moving around the screen
 
 ## Components
 
-* Frame Rate: (p5.components.frame-rate/show)
+* Frame Rate: Toggle frame rate display using `(p5.components.frame-rate/show)`
+* Child Canvas: A canvas that gets it's size from it's parent element `(p5.components.child-canvas/create-canvas "my-id")`
+
+
+## Vector Math
+
+For immutable 2d vectors and helper functions see `src/vecvec/v2d.cljs`.
+
+A 2d vector is represented using normal clojure vectors `[x y]`. This allows for easy destructuring and immutability.
+
+```
+(let [[x y] (-> (v2d/random)
+                (v2d/add (v2d/new 1 2)
+                v2d/abs))]
+  x)
+```
 
 ## Setup
 
