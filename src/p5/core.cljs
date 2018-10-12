@@ -267,7 +267,7 @@
   (aset "setup" setup)
   (aset "draw" draw)
   (aset "mouseClicked" mouse-clicked)
-  (aset "touchStarted" mouse-clicked))
+  #_(aset "touchStarted" mouse-clicked))
 
 
 ;;;; FIGWHEEL
