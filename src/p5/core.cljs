@@ -26,14 +26,14 @@
          (filter (fn [[x y]]
                    (and (>= x 0) (>= y 0)
                         (< x row-count) (< y col-count))))
-         (map (fn [[x y]] (index col-count x y))))))
+         (map (fn [[x y]]
+                (index col-count x y))))))
 
 
 (defn cell [col-count i]
   (let [[x y] (position col-count i)]
-    {:i i
+    {:i i :x x :y y
      :type :empty
-     :x x :y y
      :flagged? false
      :opened? false}))
 
@@ -48,43 +48,41 @@
 
 (defn place-bombs [bomb-count cells-map]
   (loop [bomb-count bomb-count
-         available-spaces (set (keys cells-map))
+         empty-cells (set (keys cells-map))
          result cells-map]
     (if (<= bomb-count 0)
       result
-      (let [bomb-index (nth (vec available-spaces) (rand-int (count available-spaces)))]
+      (let [random-index (rand-int (count empty-cells))
+            bomb-index (nth (vec empty-cells) random-index)]
         (recur
          (dec bomb-count)
-         (disj available-spaces bomb-index)
+         (disj empty-cells bomb-index)
          (assoc-in result [bomb-index :type] :bomb))))))
 
 
 (defn set-neighbours [row-count col-count cells-map]
   (->> cells-map
        (map (fn [[i cell]]
-              (let [neighbours (neighbours row-count col-count cell)
+              (let [neighbours     (neighbours row-count col-count cell)
                     bombs-touching (->> neighbours
-                                        (map #(get cells-map %))
-                                        (map :type)
-                                        (filter #(= :bomb %))
-                                        (count))]
-                (assoc cell
-                       :neighbours neighbours
-                       :bombs-touching bombs-touching
-                       :type (cond
-                               (= :bomb (:type cell)) :bomb
-                               (> bombs-touching 0) :bomb-adjacent
-                               :else (:type cell))))))
-       (map (juxt :i identity))
+                                        (filter #(= :bomb (get-in cells-map [% :type])))
+                                        count)]
+                [i
+                 (assoc cell
+                        :neighbours neighbours
+                        :bombs-touching bombs-touching
+                        :type (cond
+                                (= :bomb (:type cell)) :bomb
+                                (> bombs-touching 0)   :bomb-adjacent
+                                :else                  (:type cell)))])))
        (into {})))
 
 
 (defn board [row-count col-count bomb-count]
-  (let [size (* row-count col-count)
-        cells (->> (init-cells row-count col-count)
-                   (place-bombs bomb-count)
-                   (set-neighbours row-count col-count))]
-    cells))
+  (let [size (* row-count col-count)]
+    (->> (init-cells row-count col-count)
+         (place-bombs bomb-count)
+         (set-neighbours row-count col-count))))
 
 
 (defn adjacent-open-cells
@@ -102,65 +100,110 @@
           (recur (disj cells-to-check i)
                  (conj cells-checked i)
                  cells-to-open)
-          (let [neighbours-to-add (if-not (= :empty t)
-                                    []
-                                    (->> neighbours
-                                         (filter #(not (contains? cells-checked %)))
-                                         (filter #(not (contains? cells-to-check %)))))]
+          (let [cells-not-to-check (into cells-checked cells-to-check)
+                neighbours-to-add (when (= :empty t)
+                                    (filter #(not (contains? cells-not-to-check %))  neighbours))]
             (recur (into (disj cells-to-check i) neighbours-to-add)
                    (conj cells-checked i)
                    (conj cells-to-open i))))))))
-
-
-;;;; STATE
-
-(defonce *state (atom {:dead? false
-                       :win? false
-                       :board nil}))
 
 
 (defn toggle-cell-flag [board i]
   (update-in board [i :flagged?] not))
 
 
-(defn open-cell [board i]
+(defn detonate [board {:keys [i] :as cell}]
+  (->> (assoc-in board [i :killer?] true)
+       (map (fn [[i cell]]
+              [i (assoc cell :opened? true)]))
+       (into {})))
+
+
+(defn open-adjacent-cell [board i]
+  (assoc-in board [i :opened?] true))
+
+
+(defn open-empty-cell [board i]
+  (reduce
+   (fn [b i]
+     (open-adjacent-cell b i))
+   board
+   (adjacent-open-cells board i)))
+
+
+(defn not-opened-non-bomb-cell? [cell]
+  (and (false? (:opened? cell)) (not= :bomb (:type cell))))
+
+
+(defn win? [board]
+  (->> board
+       vals
+       (filter not-opened-non-bomb-cell?)
+       empty?))
+
+
+(defn open-cell [{:keys [board] :as state} i]
   (let [cell (get board i)
         bomb? (= :bomb (:type cell))
         empty? (= :empty (:type cell))
         next-board
         (cond
-          bomb? (->> (assoc-in board [i :killer?] true)
-                       (map (fn [[i cell]]
-                              [i (assoc cell :opened? true)]))
-                       (into {}))
-          empty? (reduce (fn [b i]
-                             (assoc-in b [i :opened?] true))
-                           board (adjacent-open-cells board i))
-          :else (assoc-in board [i :opened?] true))
-        win? (->> next-board
-                  vals
-                  (filter #(and (false? (:opened? %)) (not= :bomb (:type %))))
-                  count
-                  (= 0))]
-    {:board next-board
-     :dead? bomb?
-     :win? win?}))
+          bomb? (detonate board cell)
+          empty? (open-empty-cell board i)
+          :else (open-adjacent-cell board i))
+        win? (win? next-board)]
+    (merge state
+           {:board next-board
+            :dead? bomb?
+            :win? win?})))
 
-;;;; P5
+
+(defn new-game [rows cols bombs]
+  {:board (board rows cols bombs)
+   :win? false
+   :dead? false})
+
+
+;;;; GAME
+
+(defonce *state (atom nil))
 
 (def size 20)
-(def rows 30)
-(def cols 30)
-(def bombs 120)
+(def rows 5)
+(def cols 5)
+(def bombs 2)
 
-(defn new-board [] (board rows cols bombs))
+
+(defn reset []
+  (reset! *state (new-game rows cols bombs)))
+
+
+(defn mouse-clicked []
+  (let [mx js/mouseX
+        my js/mouseY
+        in-bounds? (and (< mx (* size rows)) (< my (* size cols)))
+        x (js/Math.floor (/ mx size))
+        y (js/Math.floor (/ my size))
+        i (index cols x y)
+        ctrl-pressed? (= 16 (when js/keyIsPressed js/keyCode))
+        dead? (:dead? @*state)
+        win? (:win? @*state)
+        f (cond
+            (or dead? win?) #(reset)
+            (not in-bounds?) identity
+            ctrl-pressed? #(update % :board toggle-cell-flag i)
+            :else #(open-cell % i))]
+    (swap! *state f)
+    (js/redraw)))
+
+
+;;;; DRAW
 
 (defn setup []
-  (let [board (new-board)]
-    (swap! *state assoc :board board)
-    (js/createCanvas (+ 1 (* rows size)) (+ 1 (* cols size)))
-    (js/rectMode "CENTER")
-    (js/noStroke)))
+  (reset)
+  (js/createCanvas (+ 1 (* rows size)) (+ 1 (* cols size)))
+  (js/rectMode "CENTER")
+  (js/noStroke))
 
 
 (defn draw-initial-cell []
@@ -217,23 +260,6 @@
   (js/noLoop))
 
 
-(defn mouse-clicked []
-  (let [mx js/mouseX
-        my js/mouseY
-        in-bounds? (and (< mx (* size rows)) (< my (* size cols)))
-        x (js/Math.floor (/ mx size))
-        y (js/Math.floor (/ my size))
-        i (index cols x y)
-        ctrl-pressed? (= 16 (when js/keyIsPressed js/keyCode))
-        dead? (:dead? @*state)
-        win? (:win? @*state)
-        f (cond
-            (or dead? win?) #(hash-map :dead? false :board (new-board) :win? false)
-            (not in-bounds?) identity
-            ctrl-pressed? #(update % :board toggle-cell-flag i)
-            :else #(open-cell (:board %) i))]
-    (swap! *state f)
-    (js/redraw)))
 
 ;;;; INIT
 
