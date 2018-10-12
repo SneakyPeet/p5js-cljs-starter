@@ -168,10 +168,10 @@
 
 (defonce *state (atom nil))
 
-(def size 20)
-(def rows 5)
-(def cols 5)
-(def bombs 2)
+(def size 30)
+(def rows 10)
+(def cols 10)
+(def bombs 30)
 
 
 (defn reset []
@@ -266,7 +266,8 @@
 (doto js/window
   (aset "setup" setup)
   (aset "draw" draw)
-  (aset "mouseClicked" mouse-clicked))
+  (aset "mouseClicked" mouse-clicked)
+  (aset "touchStarted" mouse-clicked))
 
 
 ;;;; FIGWHEEL
