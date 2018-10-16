@@ -5,34 +5,34 @@
 
 
 (defn position [col-count i]
-  (let [x (mod i col-count)
-        y (/ (- i x) col-count)]
-    [x y]))
+  (let [col (mod i col-count)
+        row (/ (- i col) col-count)]
+    [col row]))
 
 
-(defn index [col-count x y] (+ x (* y col-count)))
+(defn index [col-count row col] (+ col (* row col-count)))
 
 
 (defn neighbours [row-count col-count cell]
-  (let [{:keys [i x y]} cell
-        x- (dec x)
-        x+ (inc x)
-        y- (dec y)
-        y+ (inc y)
-        neighbours [[x- y-] [x- y ] [x- y+]
-                    [x  y-]         [x  y+]
-                    [x+ y-] [x+ y ] [x+ y+]]]
+  (let [{:keys [i row col]} cell
+        row- (dec row)
+        row+ (inc row)
+        col- (dec col)
+        col+ (inc col)
+        neighbours [[col- row-] [col row-] [col+ row-]
+                    [col- row]             [col+ row]
+                    [col- row+] [col row+] [col+ row+]]]
     (->> neighbours
-         (filter (fn [[x y]]
-                   (and (>= x 0) (>= y 0)
-                        (< x row-count) (< y col-count))))
-         (map (fn [[x y]]
-                (index col-count x y))))))
+         (filter (fn [[col row]]
+                   (and (>= row 0) (>= col 0)
+                        (< row row-count) (< col col-count))))
+         (map (fn [[col row]]
+                (index col-count row col))))))
 
 
 (defn cell [col-count i]
-  (let [[x y] (position col-count i)]
-    {:i i :x x :y y
+  (let [[col row] (position col-count i)]
+    {:i i :row row :col col
      :type :empty
      :flagged? false
      :opened? false}))
@@ -79,10 +79,9 @@
 
 
 (defn board [row-count col-count bomb-count]
-  (let [size (* row-count col-count)]
-    (->> (init-cells row-count col-count)
-         (place-bombs bomb-count)
-         (set-neighbours row-count col-count))))
+  (->> (init-cells row-count col-count)
+       (place-bombs bomb-count)
+       (set-neighbours row-count col-count)))
 
 
 (defn adjacent-open-cells
@@ -125,8 +124,7 @@
 
 (defn open-empty-cell [board i]
   (reduce
-   (fn [b i]
-     (open-adjacent-cell b i))
+   (fn [b i] (open-adjacent-cell b i))
    board
    (adjacent-open-cells board i)))
 
@@ -161,30 +159,35 @@
 (defn new-game [rows cols bombs]
   {:board (board rows cols bombs)
    :win? false
-   :dead? false})
+   :dead? false
+   :rows rows
+   :cols cols
+   :bombs bombs
+   :size 20})
 
 
 ;;;; GAME
 
 (defonce *state (atom nil))
 
-(def size 30)
-(def rows 10)
-(def cols 10)
-(def bombs 30)
+
+(defn easy-game []
+  (reset! *state (new-game 5 10 5)))
 
 
 (defn reset []
-  (reset! *state (new-game rows cols bombs)))
+  (let [{:keys [rows cols bombs]} @*state]
+    (reset! *state (new-game rows cols bombs))))
 
 
 (defn mouse-clicked []
-  (let [mx js/mouseX
+  (let [{:keys [rows cols size]} @*state
+        mx js/mouseX
         my js/mouseY
-        in-bounds? (and (< mx (* size rows)) (< my (* size cols)))
-        x (js/Math.floor (/ mx size))
-        y (js/Math.floor (/ my size))
-        i (index cols x y)
+        in-bounds? (and (< mx (* size cols)) (< my (* size rows)))
+        col (js/Math.floor (/ mx size))
+        row (js/Math.floor (/ my size))
+        i (index cols row col)
         ctrl-pressed? (= 16 (when js/keyIsPressed js/keyCode))
         dead? (:dead? @*state)
         win? (:win? @*state)
@@ -200,29 +203,34 @@
 ;;;; DRAW
 
 (defn setup []
-  (reset)
-  (js/createCanvas (+ 1 (* rows size)) (+ 1 (* cols size)))
-  (js/rectMode "CENTER")
-  (js/noStroke))
+  (easy-game)
+  (let [{:keys [rows cols size]} @*state]
+    (js/createCanvas (+ 1 (* cols size)) (+ 1 (* rows size)))
+    (js/background 255 0 0)
+    (js/rectMode "CENTER")
+    (js/noStroke)))
 
 
 (defn draw-initial-cell []
   (if (:win? @*state)
     (js/fill 0 255 0)
     (js/fill 240))
-  (js/rect 0 0 size size))
+  (let [{:keys [size]} @*state]
+    (js/rect 0 0 size size)))
 
 
 (defn draw-flagged-cell []
   (draw-initial-cell)
   (js/fill 255 150 0)
   (js/noStroke)
-  (js/ellipse (/ size 2) (/ size 2) (/ size 3) (/ size 3)))
+  (let [{:keys [size]} @*state]
+    (js/ellipse (/ size 2) (/ size 2) (/ size 3) (/ size 3))))
 
 
 (defn draw-empty-cell []
   (js/fill 150)
-  (js/rect 0 0 size size))
+  (let [{:keys [size]} @*state]
+    (js/rect 0 0 size size)))
 
 
 (defmulti draw-cell :type)
@@ -236,7 +244,8 @@
   (draw-empty-cell)
   (js/fill 255 0 0)
   (js/noStroke)
-  (js/ellipse (/ size 2) (/ size 2) (/ size 2) (/ size 2)))
+  (let [{:keys [size]} @*state]
+    (js/ellipse (/ size 2) (/ size 2) (/ size 2) (/ size 2))))
 
 
 (defmethod draw-cell :bomb-adjacent [cell]
@@ -244,19 +253,22 @@
   (js/noStroke)
   (js/fill (* 50 (:bombs-touching cell)) 0 0)
   (js/textSize 15)
-  (js/text (str (:bombs-touching cell)) (/ size 2.2) (/ size 1.5)))
+  (let [{:keys [size]} @*state]
+    (js/text (str (:bombs-touching cell)) (/ size 2.2) (/ size 1.5))))
 
 
 (defn draw []
-  (doseq [[i {:keys [x y flagged? opened?] :as cell}] (:board @*state)]
-    (js/push)
-    (js/stroke 180)
-    (js/translate (* x size) (* y size))
-    (cond
-      opened? (draw-cell cell)
-      flagged? (draw-flagged-cell)
-      :else (draw-initial-cell))
-    (js/pop))
+  (let [{:keys [size board]} @*state]
+    (doseq [[i {:keys [row col flagged? opened?] :as cell}] board]
+      (prn [col row])
+      (js/push)
+      (js/stroke 180)
+      (js/translate (* col size) (* row size))
+      (cond
+        opened? (draw-cell cell)
+        flagged? (draw-flagged-cell)
+        :else (draw-initial-cell))
+      (js/pop)))
   (js/noLoop))
 
 
