@@ -163,16 +163,12 @@
    :rows rows
    :cols cols
    :bombs bombs
-   :size 20})
+   :size 35})
 
 
 ;;;; GAME
 
 (defonce *state (atom nil))
-
-
-(defn easy-game []
-  (reset! *state (new-game 5 10 5)))
 
 
 (defn reset []
@@ -200,10 +196,26 @@
     (js/redraw)))
 
 
+(defn ^:export easy-game []
+  (reset! *state (new-game 10 10 10)))
+
+
+(defn ^:export medium-game []
+  (reset! *state (new-game 16 16 40)))
+
+
+(defn ^:export hard-game []
+  (reset! *state (new-game 16 30 99)))
+
+
+(defn ^:export phone-game []
+  (reset! *state (new-game 8 8 8)))
+
+
 ;;;; DRAW
 
 (defn setup []
-  (easy-game)
+  (phone-game)
   (let [{:keys [rows cols size]} @*state]
     (js/createCanvas (+ 1 (* cols size)) (+ 1 (* rows size)))
     (js/background 255 0 0)
@@ -260,7 +272,6 @@
 (defn draw []
   (let [{:keys [size board]} @*state]
     (doseq [[i {:keys [row col flagged? opened?] :as cell}] board]
-      (prn [col row])
       (js/push)
       (js/stroke 180)
       (js/translate (* col size) (* row size))
@@ -278,8 +289,7 @@
 (doto js/window
   (aset "setup" setup)
   (aset "draw" draw)
-  (aset "mouseClicked" mouse-clicked)
-  #_(aset "touchStarted" mouse-clicked))
+  (aset "touchStarted" mouse-clicked))
 
 
 ;;;; FIGWHEEL
